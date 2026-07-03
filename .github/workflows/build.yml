@@ -112,7 +112,7 @@ jobs:
           else
             ZIP=$(ls dist/save-image-chrome/*.zip | head -1)
             VER=$(echo "$ZIP" | sed 's/.*save-image-chrome-//; s/\.zip$//')
-            echo "name=v${VER}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+            echo "name=v${VER}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create / update release
