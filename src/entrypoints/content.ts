@@ -67,6 +67,50 @@ export default defineContentScript({
       }
     }
 
+    // ponytail: MIME → ext; covers the formats browsers actually render. Add when needed.
+    const MIME_TO_EXT: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/gif": "gif",
+      "image/webp": "webp",
+      "image/avif": "avif",
+      "image/svg+xml": "svg",
+      "image/bmp": "bmp",
+    };
+    const DEFAULT_EXT = "jpg";
+
+    function extFromUrl(url: string): string | null {
+      // ponytail: last path segment after stripping query/hash, must look like name.ext
+      const m = url.match(/\/([^/?#]+)(?:\?|#|$)/);
+      const tail = m?.[1] ?? "";
+      const dot = tail.lastIndexOf(".");
+      if (dot < 1 || dot === tail.length - 1) return null;
+      const ext = tail.slice(dot + 1).toLowerCase();
+      return /^[a-z0-9]{2,5}$/.test(ext) ? ext : null;
+    }
+
+    async function extFromHeaders(url: string): Promise<string> {
+      try {
+        const res = await fetch(url, { method: "HEAD" });
+        const ct = res.headers.get("content-type")?.split(";")[0].trim().toLowerCase() ?? "";
+        return MIME_TO_EXT[ct] ?? DEFAULT_EXT;
+      } catch {
+        return DEFAULT_EXT;
+      }
+    }
+
+    async function buildFilename(url: string, ext: string): Promise<string> {
+      const m = url.match(/\/([^/?#]+)(?=\?|#|$)/);
+      const tail = m?.[1] ?? "";
+      const dot = tail.lastIndexOf(".");
+      const hasName = dot > 0;
+      if (hasName) {
+        // ponytail: sanitize to avoid path separators in saved filename
+        return tail.slice(0, dot).replace(/[\\/:*?"<>|]/g, "_") + "." + ext;
+      }
+      return `image-${Date.now()}.${ext}`;
+    }
+
     function onMouseOver(e: MouseEvent) {
       const img = (e.target as HTMLElement).closest<HTMLImageElement>("img");
       if (img && getImageSrc(img)) {
@@ -83,7 +127,7 @@ export default defineContentScript({
       }
     }
 
-    function onClick(e: MouseEvent) {
+    async function onClick(e: MouseEvent) {
       const img = (e.target as HTMLElement).closest<HTMLImageElement>("img");
       if (!img) return;
 
@@ -95,7 +139,8 @@ export default defineContentScript({
       deactivate();
 
       const url = resolveUrl(src);
-      const filename = url.split("/").pop()?.split("?")[0] || "image";
+      const ext = extFromUrl(url) ?? (await extFromHeaders(url));
+      const filename = await buildFilename(url, ext);
 
       browser.runtime.sendMessage({ type: "download-image", url, filename });
     }
