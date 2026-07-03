@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # ponytail: needed for softprops/action-gh-release to create releases
+  contents: write
 
 jobs:
   build:
@@ -40,19 +40,17 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Bump version (patch +0.0.1)
-        # ponytail: read current, +0.0.1, write back. WXT picks up package.json version for manifest + zip name.
-        # Skipped on tag pushes — the tag itself (v0.0.1) is the source of truth there.
-        # ponytail: node -p runs in eval mode where require('./...') resolves to [eval], not cwd — use fs + cwd instead.
-        if: github.ref_type != 'tag'
+      - name: Inject build version
         run: |
           set -e
-          PKG="$(pwd)/package.json"
-          CURRENT=$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync(process.argv[1],'utf8')).version)" "$PKG")
-          IFS='.' read -r MAJOR MINOR PATCH <<<"$CURRENT"
-          NEXT="$MAJOR.$MINOR.$((PATCH + 1))"
-          node -e "const fs=require('fs'),p=process.argv[1],v=process.argv[2]; const pkg=JSON.parse(fs.readFileSync(p,'utf8')); pkg.version=v; fs.writeFileSync(p, JSON.stringify(pkg,null,2)+'\n')" "$PKG" "$NEXT"
-          echo "version: $CURRENT -> $NEXT"
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VER="${{ github.ref_name }}"
+            VER="${VER#v}"
+          else
+            VER="0.0.${GITHUB_RUN_NUMBER}"
+          fi
+          node -e "const fs=require('fs'),p=process.argv[1]; const pkg=JSON.parse(fs.readFileSync(p,'utf8')); pkg.version=process.argv[2]; fs.writeFileSync(p, JSON.stringify(pkg,null,2)+'\n')" "$(pwd)/package.json" "$VER"
+          echo "version: $VER"
 
       - name: Prepare WXT (generates .wxt/ types)
         run: bun run postinstall
@@ -89,11 +87,9 @@ jobs:
     name: Publish Release
     needs: build
     runs-on: ubuntu-latest
-    # ponytail: fire on every main push and on tag pushes. Skip PRs.
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
       - name: Checkout
-        # ponytail: needed by action-gh-release for changelog generation (PR titles since last tag)
         uses: actions/checkout@v4
 
       - name: Download all zips
@@ -101,8 +97,6 @@ jobs:
         with:
           path: dist
 
-      # ponytail: read version from the built zip filename — no package.json parsing needed,
-      # no ENOENT risk, and it matches what WXT actually built.
       - name: Resolve tag
         id: tag
         run: |

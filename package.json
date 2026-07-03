@@ -1,6 +1,6 @@
 {
-  "name": "wxt-svelte-starter",
-  "description": "manifest.json description",
+  "name": "save-image",
+  "description": "Click any image on a page to download it.",
   "private": true,
   "version": "0.0.0",
   "type": "module",
