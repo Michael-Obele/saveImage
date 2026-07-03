@@ -105,7 +105,8 @@ jobs:
             echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           else
             ZIP=$(ls dist/save-image-chrome/*.zip | head -1)
-            VER=$(echo "$ZIP" | sed 's/.*save-image-chrome-//; s/\.zip$//')
+            # WXT zip = {name}-{version}-{browser}.zip → save-image-0.0.10-chrome.zip
+            VER=$(basename "$ZIP" .zip | sed 's/^save-image-//; s/-chrome$//; s/-firefox$//')
             echo "name=v${VER}" >> "$GITHUB_OUTPUT"
           fi
 
