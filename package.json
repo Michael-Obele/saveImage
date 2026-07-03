@@ -12,7 +12,18 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "ci:verify": "bun install --frozen-lockfile && bun run postinstall && bun run check && bun run zip && bun run zip:firefox",
+    "fallow": "fallow dead-code --format json --quiet",
+    "fallow:health": "fallow health --format json --quiet",
+    "fallow:dupes": "fallow dupes --format json --quiet",
+    "fallow:fix": "fallow fix --dry-run",
+    "fallow:audit": "fallow audit --changed-since main",
+    "act:list": "act --list",
+    "act:dry": "act -n workflow_dispatch -j build",
+    "act:chrome": "act workflow_dispatch -j build --matrix browser:chrome --reuse",
+    "act:firefox": "act workflow_dispatch -j build --matrix browser:firefox --reuse",
+    "act:all": "act workflow_dispatch -j build --reuse"
   },
   "devDependencies": {
     "@tsconfig/svelte": "^5.0.8",

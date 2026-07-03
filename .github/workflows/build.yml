@@ -1,0 +1,65 @@
+name: Build Extension
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.browser }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - browser: chrome
+            command: zip
+            artifact_name: save-image-chrome
+            artifact_path: .output/*-chrome.zip
+          - browser: firefox
+            command: zip:firefox
+            artifact_name: save-image-firefox
+            artifact_path: .output/*-firefox.zip
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Prepare WXT (generates .wxt/ types)
+        run: bun run postinstall
+
+      - name: Type-check
+        run: bun run check
+
+      - name: Build ${{ matrix.browser }} zip
+        run: bun run ${{ matrix.command }}
+
+      - name: Verify zip exists
+        run: |
+          set -e
+          ZIP=$(ls ${{ matrix.artifact_path }} 2>/dev/null | head -n 1)
+          if [ -z "$ZIP" ]; then
+            echo "::error::No zip matching '${{ matrix.artifact_path }}' was produced."
+            ls -la .output || true
+            exit 1
+          fi
+          echo "Produced artifact: $ZIP"
+
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
+          retention-days: 30
