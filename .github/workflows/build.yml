@@ -86,17 +86,32 @@ jobs:
     name: Publish Release
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    # ponytail: fire on every main push (auto-bumped version) and on tag pushes. Skip PRs.
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
       - name: Download all zips
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           path: dist
+
+      # ponytail: tag pushes use tag name; main pushes use bumped version + short sha so each build is its own release
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+            echo "name=v${VERSION}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Create / update release
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ steps.tag.outputs.name }}
+          tag_name: ${{ steps.tag.outputs.name }}
           files: |
             dist/save-image-chrome/*.zip
             dist/save-image-firefox/*.zip
           generate_release_notes: true
+          fail_on_unmatched_files: true
