@@ -46,6 +46,7 @@ jobs:
         run: bun run ${{ matrix.command }}
 
       - name: Verify zip exists
+        id: zip
         run: |
           set -e
           ZIP=$(ls ${{ matrix.artifact_path }} 2>/dev/null | head -n 1)
@@ -55,11 +56,13 @@ jobs:
             exit 1
           fi
           echo "Produced artifact: $ZIP"
+          # Resolve to absolute path so upload-artifact can find it regardless of CWD
+          echo "path=$(realpath "$ZIP")" >> "$GITHUB_OUTPUT"
 
       - name: Upload zip artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_path }}
+          path: ${{ steps.zip.outputs.path }}
           if-no-files-found: error
           retention-days: 30
