@@ -43,12 +43,15 @@ jobs:
       - name: Bump version (patch +0.0.1)
         # ponytail: read current, +0.0.1, write back. WXT picks up package.json version for manifest + zip name.
         # Skipped on tag pushes — the tag itself (v0.0.1) is the source of truth there.
+        # ponytail: node -p runs in eval mode where require('./...') resolves to [eval], not cwd — use fs + cwd instead.
         if: github.ref_type != 'tag'
         run: |
           set -e
-          CURRENT=$(node -p "require('./package.json').version")
-          NEXT=$(node -p "const [a,b,c] = '$CURRENT'.split('.').map(Number); [a,b,c+1].join('.')")
-          node -e "require('fs').writeFileSync('./package.json', JSON.stringify({...require('./package.json'), version: '$NEXT'}, null, 2) + '\n')"
+          PKG="$(pwd)/package.json"
+          CURRENT=$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync(process.argv[1],'utf8')).version)" "$PKG")
+          IFS='.' read -r MAJOR MINOR PATCH <<<"$CURRENT"
+          NEXT="$MAJOR.$MINOR.$((PATCH + 1))"
+          node -e "const fs=require('fs'),p=process.argv[1],v=process.argv[2]; const pkg=JSON.parse(fs.readFileSync(p,'utf8')); pkg.version=v; fs.writeFileSync(p, JSON.stringify(pkg,null,2)+'\n')" "$PKG" "$NEXT"
           echo "version: $CURRENT -> $NEXT"
 
       - name: Prepare WXT (generates .wxt/ types)
@@ -101,7 +104,8 @@ jobs:
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           else
-            VERSION=$(node -p "require('./package.json').version")
+            # ponytail: same eval-mode pitfall — read with fs + cwd, not require('./...')
+            VERSION=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.cwd()+'/package.json','utf8')).version)")
             echo "name=v${VERSION}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
 
