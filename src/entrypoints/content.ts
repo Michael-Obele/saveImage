@@ -50,6 +50,15 @@ export default defineContentScript({
         .forEach((el) => el.classList.remove(HOVER_CLASS));
     }
 
+    // ponytail: closest() only walks ancestors; Instagram wraps <img> in <a>, so target is the link.
+    // composedPath gives the full event path — find the img anywhere in it.
+    function findImg(e: Event): HTMLImageElement | null {
+      for (const node of e.composedPath()) {
+        if (node instanceof HTMLImageElement) return node;
+      }
+      return null;
+    }
+
     function getImageSrc(img: HTMLImageElement): string | null {
       // ponytail: try src first, then data-src for lazy images
       let src = img.currentSrc || img.src;
@@ -92,7 +101,9 @@ export default defineContentScript({
     async function extFromHeaders(url: string): Promise<string> {
       try {
         const res = await fetch(url, { method: "HEAD" });
-        const ct = res.headers.get("content-type")?.split(";")[0].trim().toLowerCase() ?? "";
+        const ct =
+          res.headers.get("content-type")?.split(";")[0].trim().toLowerCase() ??
+          "";
         return MIME_TO_EXT[ct] ?? DEFAULT_EXT;
       } catch {
         return DEFAULT_EXT;
@@ -112,7 +123,7 @@ export default defineContentScript({
     }
 
     function onMouseOver(e: MouseEvent) {
-      const img = (e.target as HTMLElement).closest<HTMLImageElement>("img");
+      const img = findImg(e);
       if (img && getImageSrc(img)) {
         hoveredImg = img;
         img.classList.add(HOVER_CLASS);
@@ -120,7 +131,7 @@ export default defineContentScript({
     }
 
     function onMouseOut(e: MouseEvent) {
-      const img = (e.target as HTMLElement).closest<HTMLImageElement>("img");
+      const img = findImg(e);
       if (img) {
         img.classList.remove(HOVER_CLASS);
         if (hoveredImg === img) hoveredImg = null;
@@ -128,7 +139,7 @@ export default defineContentScript({
     }
 
     async function onClick(e: MouseEvent) {
-      const img = (e.target as HTMLElement).closest<HTMLImageElement>("img");
+      const img = findImg(e);
       if (!img) return;
 
       const src = getImageSrc(img);
