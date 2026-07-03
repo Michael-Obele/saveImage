@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -78,7 +78,7 @@ jobs:
           echo "path=$(realpath "$ZIP")" >> "$GITHUB_OUTPUT"
 
       - name: Upload zip artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ steps.zip.outputs.path }}
@@ -89,24 +89,30 @@ jobs:
     name: Publish Release
     needs: build
     runs-on: ubuntu-latest
-    # ponytail: fire on every main push (auto-bumped version) and on tag pushes. Skip PRs.
+    # ponytail: fire on every main push and on tag pushes. Skip PRs.
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
+      - name: Checkout
+        # ponytail: needed by action-gh-release for changelog generation (PR titles since last tag)
+        uses: actions/checkout@v4
+
       - name: Download all zips
         uses: actions/download-artifact@v4
         with:
           path: dist
 
-      # ponytail: tag pushes use tag name; main pushes use bumped version + short sha so each build is its own release
+      # ponytail: read version from the built zip filename — no package.json parsing needed,
+      # no ENOENT risk, and it matches what WXT actually built.
       - name: Resolve tag
         id: tag
         run: |
+          set -e
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           else
-            # ponytail: same eval-mode pitfall — read with fs + cwd, not require('./...')
-            VERSION=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.cwd()+'/package.json','utf8')).version)")
-            echo "name=v${VERSION}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+            ZIP=$(ls dist/save-image-chrome/*.zip | head -1)
+            VER=$(echo "$ZIP" | sed 's/.*save-image-chrome-//; s/\.zip$//')
+            echo "name=v${VER}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create / update release
