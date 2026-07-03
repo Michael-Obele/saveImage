@@ -7,7 +7,6 @@ export default defineContentScript({
 
     // ponytail: inline styles, no CSS files
     const HOVER_CLASS = "sip-hover"; // sip = save-image-picker
-    const OVERLAY_CLASS = "sip-overlay";
 
     browser.runtime.onMessage.addListener((msg: any) => {
       if (msg.type === "toggle-picker") {
@@ -24,7 +23,6 @@ export default defineContentScript({
       styleEl = document.createElement("style");
       styleEl.textContent = `
         .${HOVER_CLASS} { outline: 3px solid #4CAF50 !important; outline-offset: 2px !important; cursor: crosshair !important; }
-        .${OVERLAY_CLASS} { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2147483646; cursor: crosshair; }
       `;
       document.head.appendChild(styleEl);
     }
@@ -33,13 +31,7 @@ export default defineContentScript({
       if (active) return;
       active = true;
       injectStyles();
-
-      // Overlay prevents normal clicks while in picker mode
-      const overlay = document.createElement("div");
-      overlay.className = OVERLAY_CLASS;
-      overlay.id = "sip-overlay";
-      document.body.appendChild(overlay);
-
+      // ponytail: capture-phase document listeners + preventDefault cover click blocking; no overlay needed
       document.addEventListener("mouseover", onMouseOver, true);
       document.addEventListener("mouseout", onMouseOut, true);
       document.addEventListener("click", onClick, true);
@@ -56,7 +48,6 @@ export default defineContentScript({
       document
         .querySelectorAll(`.${HOVER_CLASS}`)
         .forEach((el) => el.classList.remove(HOVER_CLASS));
-      document.getElementById("sip-overlay")?.remove();
     }
 
     function getImageSrc(img: HTMLImageElement): string | null {
