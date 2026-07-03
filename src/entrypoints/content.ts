@@ -50,11 +50,23 @@ export default defineContentScript({
         .forEach((el) => el.classList.remove(HOVER_CLASS));
     }
 
-    // ponytail: closest() only walks ancestors; Instagram wraps <img> in <a>, so target is the link.
-    // composedPath gives the full event path — find the img anywhere in it.
+    // ponytail: target may be an <a>/<div>/shadow host wrapping the <img>. composedPath lists ancestors,
+    // not descendants, so an <img> inside the click target is invisible. Drill: prefer target's own img
+    // child, then fall back to walking the path for nested elements that contain one.
     function findImg(e: Event): HTMLImageElement | null {
+      const start = e.target as Element | null;
+      if (start instanceof HTMLImageElement) return start;
+      if (start) {
+        // ponytail: querySelector searches descendants, catches <a><img></a> + nested wrappers
+        const inside = start.querySelector?.("img");
+        if (inside) return inside;
+      }
       for (const node of e.composedPath()) {
-        if (node instanceof HTMLImageElement) return node;
+        if (node === start) continue; // already checked
+        if (node instanceof Element) {
+          const inside = node.querySelector?.("img");
+          if (inside) return inside;
+        }
       }
       return null;
     }
