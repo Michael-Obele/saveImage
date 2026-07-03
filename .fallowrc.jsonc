@@ -1,0 +1,83 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+
+  // ----------------------------------------------------------------------
+  // Entry points
+  // ----------------------------------------------------------------------
+  // Fallow defaults to `.wxt/tsconfig.json` (an internal typegen file) as
+  // the only entry, which flags every WXT entrypoint as dead. WXT scans
+  // the `entrypoints/` directory at build time to wire up background,
+  // content scripts, and popups — declare them explicitly so fallow
+  // understands the real surface area.
+  // See: https://wxt.dev/guide/essentials/entrypoints.html
+  "entry": [
+    "src/entrypoints/background.ts",
+    "src/entrypoints/content.ts",
+    "src/entrypoints/popup/main.ts",
+    "src/entrypoints/popup/App.svelte",
+    "src/entrypoints/popup/index.html",
+    "wxt.config.ts"
+  ],
+
+  // ----------------------------------------------------------------------
+  // Files fallow should skip entirely
+  // ----------------------------------------------------------------------
+  // `.output/` and `.wxt/` are WXT's build artifacts and typegen — they
+  // never belong in dead-code analysis. `public/` contains icons and the
+  // extension icon set that `wxt.config.ts` and the manifest reference
+  // by string path, so they're loaded dynamically by the bundler.
+  "ignorePatterns": [
+    ".output/**",
+    ".wxt/**",
+    "node_modules/**",
+    "**/*.generated.ts",
+    "web-ext.config.ts"
+  ],
+
+  // Files loaded by the manifest at build time (icon paths, HTML assets
+  // referenced from the popup, etc). Listing them as dynamic keeps fallow
+  // from flagging them as unreachable.
+  "dynamicallyLoaded": ["public/**", "src/entrypoints/popup/app.css"],
+
+  // ----------------------------------------------------------------------
+  // Dependencies fallow can't see but the WXT build uses
+  // ----------------------------------------------------------------------
+  // Fallow detects direct `import` statements. WXT's toolchain resolves
+  // these packages internally (via the build pipeline, not source
+  // imports), so they would otherwise be false-positive unused deps:
+  //   - @wxt-dev/module-svelte: registered in `wxt.config.ts` modules
+  //   - @tsconfig/svelte:      extended transitively via `.wxt/tsconfig.json`
+  //   - tslib:                 TypeScript runtime helpers used by emit
+  "ignoreDependencies": ["@wxt-dev/module-svelte", "@tsconfig/svelte", "tslib"],
+
+  // ----------------------------------------------------------------------
+  // Severity rules
+  // ----------------------------------------------------------------------
+  // Defaults are tuned for a small browser-extension codebase. Keep
+  // `unused-files` / `unused-exports` / `unresolved-imports` as errors
+  // (they're almost always real bugs). Soften `unused-types` and
+  // `unused-dependencies` because public-API types and transitive
+  // build-time deps are easy to false-positive on.
+  "rules": {
+    "unused-files": "error",
+    "unused-exports": "error",
+    "unused-types": "warn",
+    "unused-dependencies": "warn",
+    "unused-dev-dependencies": "warn",
+    "unused-enum-members": "warn",
+    "unused-class-members": "warn",
+    "unresolved-imports": "error",
+    "unlisted-dependencies": "error",
+    "duplicate-exports": "error",
+    "circular-dependencies": "error",
+    "boundary-violations": "off",
+    "stale-suppressions": "warn"
+  },
+
+  // ----------------------------------------------------------------------
+  // Exported symbols whose only use is inside the same file should still
+  // count as used (matches knip behaviour, avoids noise on type
+  // re-exports inside the same module).
+  // ----------------------------------------------------------------------
+  "ignoreExportsUsedInFile": true
+}
