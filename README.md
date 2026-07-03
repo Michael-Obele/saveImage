@@ -47,21 +47,11 @@ bun run zip:firefox      # → .output/save-image-0.0.0-firefox.zip + sources zi
 
 The unzipped output in `.output/{chrome|firefox}-mv3/` is what you load as an unpacked extension.
 
-## Continuous Integration
+## Releases
 
-Every push and PR to `main` builds both targets. The workflow is defined in [`.github/workflows/build.yml`](.github/workflows/build.yml).
+Every push to `main` creates a [GitHub Release](../../releases) with both the Chrome and Firefox builds attached. Each release gets an auto-incrementing version (`v0.0.1`, `v0.0.2`, …). Tagged releases (`v1.0.0`, …) work the same way with the tag name as the version.
 
-To grab a fresh build:
-
-1. Open the [Actions tab](../../actions/workflows/build.yml).
-2. Pick the latest successful run.
-3. Scroll to **Artifacts** at the bottom of the run summary.
-4. Download either:
-   - `save-image-chrome` → the Chromium build
-   - `save-image-firefox` → the Firefox build
-5. Unzip the artifact (it contains a single `.zip`; unzip once more to get the extension folder).
-
-You can also trigger a build manually with the **Run workflow** button on the Actions page.
+You can also trigger a build manually from the [Actions tab](../../actions/workflows/build.yml).
 
 ## Installation
 
@@ -71,19 +61,19 @@ This extension is **not on the Chrome Web Store or Firefox Add-ons (AMO)**, so i
 
 Works on any Chromium browser with extension support.
 
-1. Download the `save-image-chrome` artifact from the latest successful [Actions run](../../actions/workflows/build.yml) (see [CI](#continuous-integration) above).
-2. Unzip it. You should end up with a folder that contains `manifest.json` at the root.
-3. Open `chrome://extensions` in a new tab.
-4. Toggle **Developer mode** on (top-right corner).
-5. Click **Load unpacked** and select the unzipped folder (the one containing `manifest.json`).
-6. Pin the extension from the puzzle menu for easy access.
+1. Go to the [Releases page](../../releases) and pick the version you want.
+2. Under **Assets**, download `save-image-chrome-*.zip`.
+3. Unzip it — you'll get a folder containing `manifest.json`.
+4. Open `chrome://extensions` in a new tab.
+5. Toggle **Developer mode** on (top-right corner).
+6. Click **Load unpacked** and select the unzipped folder.
+7. Pin the extension from the puzzle menu for easy access.
 
-**Updating:** Download a new artifact, then on `chrome://extensions` click the **reload** icon on the extension's card. You may need to refresh any open tabs so content scripts reload.
+**Updating:** Download a newer release, then on `chrome://extensions` click the **reload** icon on the extension's card. You may need to refresh open tabs so the content scripts reload.
 
 **Notes:**
 
 - The extension needs the `downloads` permission. Chrome will warn you on first install; this is normal.
-- If you see "Manifest version 2 is deprecated, and support will be removed in 2024", make sure you downloaded the **Chrome** artifact, not the Firefox one — WXT emits MV2 for Firefox.
 
 ### Firefox
 
@@ -93,12 +83,14 @@ Firefox has two install paths. **Use temporary add-ons for development and testi
 
 The simplest path. The extension stays installed until you restart Firefox, then you reload it.
 
-1. Download the `save-image-firefox` artifact from the latest successful [Actions run](../../actions/workflows/build.yml) and unzip it.
-2. Open `about:debugging` in a new tab.
-3. Click **This Firefox** in the left sidebar.
-4. Click **Load Temporary Add-on…**.
-5. In the file picker, navigate into the unzipped folder and select any file inside it (typically `manifest.json`).
-6. The extension appears under **Temporary Extensions** and works immediately.
+1. Go to the [Releases page](../../releases) and pick the version you want.
+2. Under **Assets**, download `save-image-firefox-*.zip`.
+3. Unzip it — you'll get a folder containing `manifest.json`.
+4. Open `about:debugging` in a new tab.
+5. Click **This Firefox** in the left sidebar.
+6. Click **Load Temporary Add-on…**.
+7. In the file picker, navigate into the unzipped folder and select `manifest.json`.
+8. The extension appears under **Temporary Extensions** and works immediately.
 
 **Updating:** On the same `about:debugging` → This Firefox page, click the **Reload** button next to the extension. You may also need to refresh open tabs so the content script reloads.
 
@@ -109,16 +101,13 @@ The simplest path. The extension stays installed until you restart Firefox, then
 
 #### Option B — Permanent install (Firefox Developer / Nightly)
 
-If you want a permanent install without going through AMO, use a development build of Firefox that allows unsigned XPIs.
-
 1. Install [Firefox Developer Edition](https://www.mozilla.org/en-US/firefox/developer/) or [Firefox Nightly](https://www.mozilla.org/en-US/firefox/channel/desktop/#nightly).
-2. Open `about:config` in a new tab, accept the risk warning, and set:
+2. Open `about:config`, accept the risk warning, and set:
    ```
    xpinstall.signatures.required = false
    ```
-3. Unzip the `save-image-firefox` artifact. Rename the inner folder to something like `save-image@local` if you like.
-4. Open `about:addons` in a new tab.
-5. Click the gear icon → **Install Add-on From File…** and pick the folder (or zip the folder first and pick the `.zip`).
+3. Download the `save-image-firefox-*.zip` from the [Releases page](../../releases) and unzip it.
+4. Open `about:addons`, click the gear icon → **Install Add-on From File…** and pick the folder (or re-zip it first and pick the `.zip`).
 
 **Updating:** Replace the folder on disk, then toggle the extension off and on in `about:addons` to pick up the new files.
 
