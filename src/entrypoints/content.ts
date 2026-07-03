@@ -1,0 +1,112 @@
+export default defineContentScript({
+  matches: ["<all_urls>"],
+  main() {
+    let active = false;
+    let styleEl: HTMLStyleElement | null = null;
+    let hoveredImg: HTMLImageElement | null = null;
+
+    // ponytail: inline styles, no CSS files
+    const HOVER_CLASS = "sip-hover"; // sip = save-image-picker
+    const OVERLAY_CLASS = "sip-overlay";
+
+    browser.runtime.onMessage.addListener((msg: any) => {
+      if (msg.type === "toggle-picker") {
+        msg.active ? activate() : deactivate();
+        return Promise.resolve({ active });
+      }
+      if (msg.type === "get-state") {
+        return Promise.resolve({ active });
+      }
+    });
+
+    function injectStyles() {
+      if (styleEl) return;
+      styleEl = document.createElement("style");
+      styleEl.textContent = `
+        .${HOVER_CLASS} { outline: 3px solid #4CAF50 !important; outline-offset: 2px !important; cursor: crosshair !important; }
+        .${OVERLAY_CLASS} { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2147483646; cursor: crosshair; }
+      `;
+      document.head.appendChild(styleEl);
+    }
+
+    function activate() {
+      if (active) return;
+      active = true;
+      injectStyles();
+
+      // Overlay prevents normal clicks while in picker mode
+      const overlay = document.createElement("div");
+      overlay.className = OVERLAY_CLASS;
+      overlay.id = "sip-overlay";
+      document.body.appendChild(overlay);
+
+      document.addEventListener("mouseover", onMouseOver, true);
+      document.addEventListener("mouseout", onMouseOut, true);
+      document.addEventListener("click", onClick, true);
+    }
+
+    function deactivate() {
+      if (!active) return;
+      active = false;
+
+      document.removeEventListener("mouseover", onMouseOver, true);
+      document.removeEventListener("mouseout", onMouseOut, true);
+      document.removeEventListener("click", onClick, true);
+
+      document
+        .querySelectorAll(`.${HOVER_CLASS}`)
+        .forEach((el) => el.classList.remove(HOVER_CLASS));
+      document.getElementById("sip-overlay")?.remove();
+    }
+
+    function getImageSrc(img: HTMLImageElement): string | null {
+      // ponytail: try src first, then data-src for lazy images
+      let src = img.currentSrc || img.src;
+      if (src && !src.startsWith("data:")) return src;
+      src = img.getAttribute("data-src") || "";
+      if (src && !src.startsWith("data:")) return src;
+      return null;
+    }
+
+    function resolveUrl(url: string): string {
+      try {
+        return new URL(url, location.href).href;
+      } catch {
+        return url;
+      }
+    }
+
+    function onMouseOver(e: MouseEvent) {
+      const img = (e.target as HTMLElement).closest<HTMLImageElement>("img");
+      if (img && getImageSrc(img)) {
+        hoveredImg = img;
+        img.classList.add(HOVER_CLASS);
+      }
+    }
+
+    function onMouseOut(e: MouseEvent) {
+      const img = (e.target as HTMLElement).closest<HTMLImageElement>("img");
+      if (img) {
+        img.classList.remove(HOVER_CLASS);
+        if (hoveredImg === img) hoveredImg = null;
+      }
+    }
+
+    function onClick(e: MouseEvent) {
+      const img = (e.target as HTMLElement).closest<HTMLImageElement>("img");
+      if (!img) return;
+
+      const src = getImageSrc(img);
+      if (!src) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      deactivate();
+
+      const url = resolveUrl(src);
+      const filename = url.split("/").pop()?.split("?")[0] || "image";
+
+      browser.runtime.sendMessage({ type: "download-image", url, filename });
+    }
+  },
+});
